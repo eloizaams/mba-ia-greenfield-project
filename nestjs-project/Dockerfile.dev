@@ -1,6 +1,10 @@
 FROM node:25.6.0-slim
 
-RUN apt update && apt install -y procps curl
+# ffmpeg/ffprobe de sistema (per phase-03-videos/TD-05 — pinning no nível da
+# imagem: a base node:25.6.0-slim fixa a release Debian e, com ela, a major
+# do ffmpeg distribuída; sem wrapper npm)
+RUN apt update && apt install -y --no-install-recommends procps curl ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /home/node/app
 

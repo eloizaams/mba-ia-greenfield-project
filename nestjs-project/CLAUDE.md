@@ -52,6 +52,34 @@ docker compose logs db
 docker compose down
 ```
 
+## Video Processing Services (Phase 03)
+
+**Storage (MinIO):**
+- Endpoint: `http://storage:9000` (container name; publicly accessible at `localhost:9000` from host)
+- Console: `http://localhost:9001` (user/password: `streamtube` / `streamtube`)
+- Bucket: `videos` (auto-created at startup via `storage-init` service)
+
+**Queue & Worker:**
+- Redis: `redis:6379` (inside containers; `localhost:6379` from host)
+- Worker service: `video-worker` (runs the processor; logs: `docker compose logs -f video-worker`)
+- Job contract: `VideoProcessingJobPayload = { videoId: string, storageKey: string }`
+- Retries: 3 attempts with exponential backoff (5s, 25s, 125s)
+
+**Environment variables (see `.env.example`):**
+- `STORAGE_ENDPOINT` — MinIO endpoint for API connection (default: `http://storage:9000`)
+- `STORAGE_PUBLIC_ENDPOINT` — endpoint for presigned URLs to browser (default: `http://localhost:9000`)
+- `REDIS_HOST`, `REDIS_PORT` — Redis connection (default: `redis:6379`)
+
+**Startup & logs:**
+
+```bash
+docker compose up -d
+docker compose ps              # verify all 7 services healthy
+docker compose logs video-worker -f  # watch worker processing
+```
+
+All npm commands still run inside `nestjs-api` container as per the "Commands" section below.
+
 ## Commands
 
 **Strict rule:** every `npm`, `npx`, `node`, `tsc`, and test command runs **inside the container**, never on the host. Running on the host causes env-var divergence (`DB_HOST` resolves to `localhost` instead of the Compose service), uses a different Node version, and produces results that do not reflect what runs in CI/prod.

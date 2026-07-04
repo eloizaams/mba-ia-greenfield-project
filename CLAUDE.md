@@ -20,10 +20,10 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 
 - **Frontend** (Next.js) → calls API via REST, streams from Object Storage
 - **API** (Nest.js) → business rules, auth, reads/writes DB, uploads to storage, publishes jobs to queue, sends emails
-- **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage
+- **Video Worker** (FFmpeg, Node.js) → consumes jobs from queue, processes videos, updates DB and storage
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
-- **Object Storage** (S3/MinIO) → video files and thumbnails
-- **Message Queue** (TBD) → video processing job queue
+- **Object Storage** (MinIO, S3-compatible) → video files and thumbnails
+- **Message Queue** (BullMQ + Redis) → video processing job queue
 - **Email Service** (SMTP) → account confirmation and password recovery
 
 ## Docker Networking
@@ -78,6 +78,31 @@ Every change must be tested. During development, run only the tests related to t
 - If something out of scope comes up during work, note it as a separate task instead of acting on it
 - Focus on the defined scope for each task to ensure clarity and maintainability of the codebase.
 - If you identify a necessary change that is out of scope, create a new issue or task for it instead of including it in the current work.
+
+## Video Processing (Phase 03)
+
+**Serviço de armazenamento:** MinIO (S3-compatible) — configurado em `compose.yaml` com bucket `videos`.
+
+**Fila de processamento:** BullMQ + Redis — producer em `VideosService`, consumer em `VideoProcessingProcessor` (worker).
+
+**Worker (vídeo):** Serviço separado `video-worker` no Compose, entrypoint em `src/worker.ts`, executa ffprobe (duração/metadados) e ffmpeg (thumbnail).
+
+**Upload de vídeos:** presigned multipart direto ao MinIO (10GB support). Endpoints:
+- `POST /videos/uploads` — inicia upload, retorna presigned part URLs
+- `POST /videos/uploads/:videoId/parts` — assina partes
+- `GET /videos/uploads/:videoId/parts` — lista partes já uploaded (resume support)
+- `POST /videos/uploads/:videoId/complete` — completa upload, enfileira job
+- `DELETE /videos/uploads/:videoId` — aborta upload
+
+**Streaming e download:** presigned GET do MinIO (206 Range support nativo).
+- `GET /videos/:publicId/stream` — retorna presigned URL (stream)
+- `GET /videos/:publicId/download` — retorna presigned URL com content-disposition=attachment
+
+**Ciclo de status:** `draft` (pré-cadastro) → `processing` (job enfileirado) → `ready` (sucesso) ou `failed` (erro).
+
+**Retry policy:** 3 tentativas com backoff exponencial (5s, 25s, 125s per BullMQ default).
+
+Ver `docs/phases/phase-03-videos/` para especificações completas (Data Model, API Contracts, Error Catalog, Events/Messages).
 
 ## Agent Skill Usage
 
