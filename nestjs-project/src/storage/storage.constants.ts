@@ -1,0 +1,2 @@
+export const STORAGE_CLIENT = Symbol('STORAGE_CLIENT');
+export const STORAGE_PUBLIC_CLIENT = Symbol('STORAGE_PUBLIC_CLIENT');
